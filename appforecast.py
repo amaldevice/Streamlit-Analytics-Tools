@@ -17,7 +17,7 @@ from data_cleaning import (display_data, read_file, clean_data,
                            handle_upload, handle_data_cleaning, handle_date_formatting,
                            handle_time_series_formatting)
 from data_prep import (diff_data,line_plot, plot_statistik, uji_stasioner,
-                       time_series_split, splitting_plot, handle_time_series_split)
+                       time_series_split, splitting_plot, handle_time_series_split, handle_plot_statistik)
 from modelling import handle_model_training, train_model_timeseries, evaluate_plot_model_results
 
 
@@ -135,9 +135,9 @@ def main():
                 categorical.drop(x, axis=1, inplace=True)
 
         # Plot Korelasi
-        corr = plot_correlation(numeric)
-
-        plot_ai_interpretation(corr, 'corr')
+        corr_img = plot_correlation(numeric)
+        if corr_img:
+            plot_ai_interpretation(corr_img, 'corr')
 
         #Plot Distribusi Data (Persebaran Data)
         dist_img = plot_distribution(df, numeric.columns)
@@ -165,7 +165,7 @@ def main():
             st.header("Tahap Peramalan")
 
             # Format Data Tanggal
-            df = handle_date_formatting(df)
+            df, freq = handle_date_formatting(df)
         
             # Format Data Time Series
             df = handle_time_series_formatting(df)
@@ -174,7 +174,7 @@ def main():
             line_plot(df)
 
             # Uji Statistik
-            plot_statistik(df)
+            handle_plot_statistik(df)
 
             # Uji Stasioneritas
             uji_stasioner(df)
@@ -188,7 +188,7 @@ def main():
             st.write(train.head())
             st.write(test.tail())
             # Modelling
-            handle_model_training(train, test)
+            handle_model_training(train, test, freq)
         elif lanjut == 'Tidak':
             st.write("Analisis Selesai")
             st.stop()

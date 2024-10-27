@@ -29,6 +29,18 @@ def generate_distribution_plot(df, column):
     return img_buffer
 
 @st.cache_data
+def generate_plot_correlation(df):
+    """Plot and display correlation heatmap."""
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(df.corr(), annot=True, cmap='coolwarm')
+    img_buffer = io.BytesIO()
+    plt.savefig(img_buffer, format='png')
+    img_buffer.seek(0)
+    plt.close()
+    return img_buffer
+
+
+@st.cache_data
 def generate_countplot(df, column):
     """Generate a countplot for the specified categorical column and return as an image buffer."""
     plt.figure(figsize=(12, 10))

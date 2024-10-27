@@ -18,40 +18,94 @@ def line_plot(df):
     st.pyplot(plt)
 
 @st.cache_data
-def plot_statistik(df):
-    st.subheader("Plot Decomposition, ACF, and PACF")
+def plot_statistik(df, lag=40, plot_acf_flag=True, plot_pacf_flag=True):
+    st.subheader("Plot Decomposition, ACF, dan PACF")
     
-    # Create a grid with 6 rows (4 for decomposition, 1 for ACF, and 1 for PACF)
-    fig, ax = plt.subplots(6, 1, figsize=(12, 18))
+    # Tentukan jumlah subplot berdasarkan pilihan pengguna
+    num_plots = 4  # Untuk plot dekomposisi
+    if plot_acf_flag:
+        num_plots += 1
+    if plot_pacf_flag:
+        num_plots += 1
     
-    # Decomposition
-    decomposition = seasonal_decompose(df, model='additive', period=1)
+    fig, ax = plt.subplots(num_plots, 1, figsize=(12, 3*num_plots))
     
-    ax[0].plot(decomposition.observed)
-    ax[0].set_title('Observed')
+    # Dekomposisi
+    decomposition = seasonal_decompose(df, model='additive', period=3)  # Sesuaikan periode sesuai data
     
-    ax[1].plot(decomposition.trend)
-    ax[1].set_title('Trend')
+    ax_idx = 0
+    ax[ax_idx].plot(decomposition.observed)
+    ax[ax_idx].set_title('Observed')
+    ax_idx += 1
     
-    ax[2].plot(decomposition.seasonal)
-    ax[2].set_title('Seasonal')
+    ax[ax_idx].plot(decomposition.trend)
+    ax[ax_idx].set_title('Trend')
+    ax_idx += 1
     
-    ax[3].plot(decomposition.resid)
-    ax[3].set_title('Residual')
+    ax[ax_idx].plot(decomposition.seasonal)
+    ax[ax_idx].set_title('Seasonal')
+    ax_idx += 1
     
-    # ACF Plot
-    plot_acf(df, lags=40, ax=ax[4])
-    ax[4].set_title("Autocorrelation Function (ACF)")
+    ax[ax_idx].plot(decomposition.resid)
+    ax[ax_idx].set_title('Residual')
+    ax_idx += 1
     
-    # PACF Plot
-    plot_pacf(df, lags=40, ax=ax[5])
-    ax[5].set_title("Partial Autocorrelation Function (PACF)")
+    # Plot ACF
+    if plot_acf_flag:
+        plot_acf(df, lags=lag, ax=ax[ax_idx])
+        ax[ax_idx].set_title("Autocorrelation Function (ACF)")
+        ax_idx += 1
     
-    # Adjust layout
+    # Plot PACF
+    if plot_pacf_flag:
+        plot_pacf(df, lags=lag, ax=ax[ax_idx])
+        ax[ax_idx].set_title("Partial Autocorrelation Function (PACF)")
+        ax_idx += 1
+    
+    # Atur layout
     fig.tight_layout()
     
-    # Display the combined plot
+    # Tampilkan plot
     st.pyplot(fig)
+
+def handle_plot_statistik(df):
+    """
+    Menangani plot statistik berdasarkan pilihan pengguna.
+
+    Parameters:
+    df (pd.Series): Seri waktu yang akan diplot.
+
+    Returns:
+    None
+    """
+    kondisi = st.radio(
+        "Apakah Anda ingin melakukan plot statistik data time series?",
+        ('Ya', 'Tidak'),
+        index=None,
+        key='plot_statistik_radio'  # Menggunakan key yang unik
+    )
+    
+    if kondisi == 'Ya':
+        st.header("Plot Statistik Data Time Series")
+        
+        # Slider untuk memilih lag
+        lag = st.number_input("Masukkan Lag", min_value=1, max_value=50, value=None, step=1, key='plot_statistik_lag')   
+        if lag is None:
+            st.warning("Masukkan nilai lag untuk plot ACF dan PACF.")
+            st.stop()
+        # Checkbox untuk memilih apakah ingin menampilkan ACF dan PACF
+        plot_acf_flag = st.checkbox("Generate ACF Plot", value=True, key='plot_acf_checkbox')
+        plot_pacf_flag = st.checkbox("Generate PACF Plot", value=True, key='plot_pacf_checkbox')
+        
+        # Panggil fungsi plot_statistik dengan parameter yang diberikan pengguna
+        plot_statistik(df, lag=lag, plot_acf_flag=plot_acf_flag, plot_pacf_flag=plot_pacf_flag)
+        
+    elif kondisi == 'Tidak':
+        st.write("Tidak ada plot statistik yang ditampilkan.")
+
+    else:
+        st.warning("Pilih opsi untuk melakukan plot statistik data time series.")
+        st.stop()
     
 @st.cache_data
 def uji_stasioner(df):

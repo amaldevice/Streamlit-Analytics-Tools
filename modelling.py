@@ -10,8 +10,8 @@ from tensorflow.keras.layers import Dense, LSTM
 import math
 
 # --------------------- LSTM Model Function ---------------------
-
-def train_lstm_model(train, test):
+    
+def train_lstm_model(train, test, freq=None):
     st.subheader("Pengaturan LSTM")
     
     # Step 1: Scaling
@@ -26,17 +26,50 @@ def train_lstm_model(train, test):
         st.stop()
     
     # Step 2: Sequence creation
-    sequence_length = st.number_input("Masukkan panjang sequence:", min_value=1, step=1, help="Panjang sequence diperlukan untuk LSTM.", value=None)
-    if sequence_length is None:
+    sequence_length = st.number_input(
+        "Masukkan panjang sequence:", 
+        min_value=1, 
+        step=1,
+        help="Panjang sequence diperlukan untuk LSTM.",
+        value=None
+    )
+    if not sequence_length:
         st.warning("Isi terlebih dahulu panjang sequence.")
         st.stop()
     
-    forecast_horizon = st.number_input("Masukkan jumlah hari untuk forecasting:", min_value=1, step=1, value=None, help="Jumlah hari ke depan yang akan diprediksi.")
-    if forecast_horizon is None:
-        st.warning("Isi terlebih dahulu jumlah hari untuk forecasting.")
+    # Prompt user to select frequency if freq is None
+    if freq is None:
+        freq = st.selectbox(
+            "Pilih frekuensi data:",
+            options=['Harian', 'Bulanan', 'Triwulan', 'Tahunan'],
+            help="Pilih frekuensi data yang sesuai dengan dataset Anda."
+        )
+        if not freq:
+            st.warning("Pilih frekuensi data.")
+            st.stop()
+    
+    # Mapping frekuensi ke label forecast_horizon
+    freq_label_map = {
+        'Harian': "jumlah hari untuk forecasting:",
+        'Bulanan': "jumlah bulan untuk forecasting:",
+        'Triwulan': "jumlah triwulan untuk forecasting:",
+        'Tahunan': "jumlah tahun untuk forecasting:"
+    }
+    forecast_label = "Masukkan " + freq_label_map.get(freq, "jumlah periode untuk forecasting:")
+    
+    forecast_horizon = st.number_input(
+        forecast_label,
+        min_value=1,
+        step=1,
+        value=None,
+        help=f"Jumlah {freq.lower()} ke depan yang akan diprediksi.",
+        key='forecast_horizon'
+    )
+    if not forecast_horizon:
+        st.warning("Isi terlebih dahulu jumlah periode untuk forecasting.")
         st.stop()
 
-    st.write(f"Melakukan forecasting untuk {forecast_horizon} hari ke depan.")
+    st.write(f"Melakukan forecasting untuk {forecast_horizon} {freq.lower()} ke depan.")
 
     def create_sequences(data, seq_length):
         X, y = [], []
@@ -90,35 +123,52 @@ def train_lstm_model(train, test):
         st.stop()
     
     # Step 5: Forecast Future Values
-    
-    forecast = []
-    last_sequence = scaled_data[-sequence_length:].reshape(1, sequence_length, 1)
-    
-    for _ in range(forecast_horizon):
-        next_pred_scaled = model.predict(last_sequence)
-        next_pred = scaler.inverse_transform(next_pred_scaled)[0, 0]
-        forecast.append(next_pred)
+    try:
+        forecast = []
+        last_sequence = scaled_data[-sequence_length:].reshape(1, sequence_length, 1)
         
-        # Update the sequence with the new prediction
-        next_pred_scaled = next_pred_scaled.reshape(1, 1, 1)
-        last_sequence = np.concatenate((last_sequence[:, 1:, :], next_pred_scaled), axis=1)
-    
-    # Create a date range for the forecasted values
-    last_date = test.index[-1]
-    future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=forecast_horizon, freq='D')
-    forecast_series = pd.Series(forecast, index=future_dates)
+        for _ in range(forecast_horizon):
+            next_pred_scaled = model.predict(last_sequence)
+            next_pred = scaler.inverse_transform(next_pred_scaled)[0, 0]
+            forecast.append(next_pred)
+            
+            # Update the sequence with the new prediction
+            last_sequence = np.concatenate((last_sequence[:, 1:, :], next_pred_scaled.reshape(1, 1, 1)), axis=1)
+        
+        # Create a date range for the forecasted values
+        last_date = test.index[-1]
+        
+        # Map freq to pandas frequency string
+        freq_map = {
+            'Harian': 'D',
+            'Bulanan': 'M',
+            'Triwulan': 'Q',
+            'Tahunan': 'Y'
+        }
+        freq_pandas = freq_map.get(freq, 'D')  # Default to 'D' if not found
+        
+        # Create date range for forecasted values
+        future_dates = pd.date_range(
+            start=last_date + pd.tseries.frequencies.to_offset(freq_pandas),
+            periods=forecast_horizon,
+            freq=freq_pandas
+        )
+        forecast_series = pd.Series(forecast, index=future_dates)
+    except Exception as e:
+        st.error(f"Terjadi kesalahan dalam forecast: {e}")
+        st.stop()
     
     return y_pred, forecast_series
 
 # --------------------- Main Training Function ---------------------
 
-def train_model_timeseries(train, test):
+def train_model_timeseries(train, test, freq):
     """
     Train LSTM time series model and forecast future values.
     """
     st.header("Training Model Peramalan dengan LSTM")
 
-    y_pred, forecast_series = train_lstm_model(train, test)
+    y_pred, forecast_series = train_lstm_model(train, test, freq)
 
     # Prepare y_true based on y_pred's index to ensure consistency
     y_true = test.loc[y_pred.index]
@@ -195,9 +245,9 @@ def evaluate_plot_model_results(train, y_test, y_pred, forecast_series):
 
 # --------------------- Handler Function ---------------------
 
-def handle_model_training(train, test):
+def handle_model_training(train, test, freq):
     """
     Handle model training, forecasting, and evaluation.
     """
-    y_true, y_pred, forecast_series = train_model_timeseries(train, test)
+    y_true, y_pred, forecast_series = train_model_timeseries(train, test, freq)
     evaluate_plot_model_results(pd.Series(train, index=train.index), y_true, y_pred, forecast_series)

@@ -148,10 +148,36 @@ def handle_data_cleaning(df):
     return df
 
 @st.cache_data
-def format_date_columns(df, date_columns):
+def format_date_columns(df, date_columns, freq):
     """Format specified columns to datetime."""
+    freq_map = {
+        'Harian': 'D',
+        'Bulanan': 'M',
+        'Triwulan': 'Q',
+        'Tahunan': 'Y'
+    }
+    freq_pandas = freq_map.get(freq)
+
+    if not freq_pandas:
+        st.warning("Frekuensi tidak dikenali. Tidak ada perubahan yang dilakukan pada data.")
+        return df
+
     for col in date_columns:
-        df[col] = pd.to_datetime(df[col], errors='coerce')
+        try:
+            if freq_pandas == 'D':
+                df[col] = pd.to_datetime(df[col], format='%Y-%m-%d', errors='coerce')
+            elif freq_pandas == 'M':
+                df[col] = pd.to_datetime(df[col], format='%Y-%m', errors='coerce')
+            elif freq_pandas == 'Q':
+                # Pandas tidak mendukung format khusus untuk triwulan, jadi kita parse tanpa format
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+                # Opsional: Konversi ke PeriodIndex jika diperlukan
+                # df[col] = df[col].dt.to_period('Q')
+            elif freq_pandas == 'Y':
+                df[col] = pd.to_datetime(df[col], format='%Y', errors='coerce')
+        except Exception as e:
+            st.error(f"Gagal memformat kolom {col}: {e}")
+
     return df
 
 def handle_date_formatting(df):
@@ -169,30 +195,58 @@ def handle_date_formatting(df):
     format_date_option = st.radio(
         "Apakah Anda ingin memformat Kolom/Variabel tanggal?",
         ('Ya', 'Tidak'),
-        index=None  # Mengatur default ke 'Tidak'
+        index=None,
+        key='format_date_option'
     )
     
     if format_date_option == 'Ya':
         date_columns = st.multiselect(
             "Pilih Kolom/Variabel yang berisi tanggal:",
             options=df.columns,
-            key='date_columns'
+            key='date_columns',
+            max_selections=1
         )
+
         if date_columns:
-            df = format_date_columns(df, date_columns)
-            st.success("Kolom/Variabel tanggal berhasil diformat!")
-            st.subheader("Data setelah pemformatan tanggal:")
-            display_data(df)
-        else:
-            st.warning("Pilih Kolom/Variabel yang berisi tanggal.")
-            st.stop()
+
+            full_format = st.radio('Apakah format tanggal lengkap? (Memiliki Tahun Bulan Hari, Contoh : 2024-31-01)', 
+                                ('Ya', 'Tidak'), 
+                                index=None, 
+                                key='full_format')
+            
+            if full_format == 'Tidak':
+                freq = st.selectbox("Pilih Frekuensi Data:", options=['Harian', 'Bulanan', 'Triwulan', 'Tahunan'], key='freq_selectbox', index=None)
+                if freq:
+                    df = format_date_columns(df, date_columns, freq)
+                    st.success("Kolom/Variabel tanggal berhasil diformat!")
+                    st.subheader("Data setelah diformat:")
+                    display_data(df)
+                    return df, freq
+                else:
+                    st.warning("Pilih Frekuensi Data.")
+                    st.stop()
+            elif full_format == 'Ya':
+                for col in date_columns:
+                    try:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                    except Exception as e:
+                        st.error(f"Gagal memformat kolom {col}: {e}")
+                
+                st.success("Kolom/Variabel tanggal berhasil diformat!")
+                st.subheader("Data setelah diformat:")
+                display_data(df)
+                return df, None
+            else:
+                st.warning("Pilih Kolom/Variabel yang berisi tanggal.")
+                st.stop()
     elif format_date_option == 'Tidak':
         st.info("Kolom/Variabel tanggal tidak diformat.")
+        return df, None
     else:
         st.warning("Pilih opsi untuk memformat Kolom/Variabel tanggal.")
         st.stop()
     
-    return df
+    return df, None
 
 def clean_timeseries_data(df):
     df = df.copy()
@@ -236,7 +290,7 @@ def handle_time_series_formatting(df, resample=None):
 
         if resample:
             df = time_series_formatting(df, date_column, target_column)
-            df = df.resample(resample).mean()
+            df = df.resample(resample).sum()
             df = clean_timeseries_data(df)
             st.success(f"Data Time Series berhasil di-resample dengan interval {resample}!")
             st.write(df.head())

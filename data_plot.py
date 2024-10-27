@@ -8,20 +8,27 @@ import io
 import PIL.Image
 import streamlit as st
 import base64
-from generate_plot import generate_distribution_plot, generate_countplot, generate_countplot_categoric, generate_aggregasi_plot, generate_ai_interpret
+from generate_plot import generate_distribution_plot, generate_countplot, generate_countplot_categoric, generate_aggregasi_plot, generate_ai_interpret, generate_plot_correlation
 
-@st.cache_data
+
 def plot_correlation(df):
-    """Plot and display correlation heatmap."""
-    st.subheader('Korelasi antar Kolom/Variabel:')
-    plt.figure(figsize=(12, 10))
-    sns.heatmap(df.corr(), annot=True, cmap='coolwarm')
-    img_buffer = io.BytesIO()
-    plt.savefig(img_buffer, format='png')
-    img_buffer.seek(0)
-    st.pyplot(plt)
-    plt.clf()
-    return img_buffer
+    """Handle user interaction for correlation plotting and return image buffer if plotted."""
+    # Pilihan pengguna untuk melihat korelasi antar kolom
+    corr_plot = st.radio("Apakah Anda ingin melihat plot korelasi antar kolom?", ('Ya', 'Tidak'), index=None)
+
+    if corr_plot == 'Ya':
+        st.subheader("Korelasi antar Kolom/Variabel:")
+        # Panggil fungsi generate_plot_correlation untuk mendapatkan buffer gambar
+        corr_img = generate_plot_correlation(df)
+        # Tampilkan gambar menggunakan st.image
+        st.image(corr_img, caption='Korelasi antar Kolom')
+        return corr_img
+    elif corr_plot == 'Tidak':
+        st.write("Plot korelasi antar kolom tidak divisualisasikan.")
+        return None
+    else:
+        st.warning("Pilih opsi untuk melihat plot korelasi antar kolom.")
+        st.stop()
 
 def plot_distribution(df, numeric_columns):
     """Handle user interaction for plotting distribution and return image buffer if plotted."""
@@ -210,7 +217,7 @@ def plot_ai_interpretation(img_buffer, identifier):
     system_prompt = st.text_area(
         "Masukkan peran sistem (System Role):",
         value="",
-        help = "Contoh : Anda adalah seorang senior data analyst dengan keahlian dalam interpretasi visualisasi data dan memberikan insight serta rekomendasi "
+        help = "Anda adalah seorang senior data analyst dengan keahlian dalam interpretasi visualisasi data dan memberikan insight serta rekomendasi "
                "yang relevan. Berdasarkan visualisasi yang diberikan, Anda akan mengidentifikasi tren, pola, atau anomali utama. Kemudian, Anda akan memberikan insight mendalam terkait hasil tersebut serta menyarankan langkah-langkah strategis atau "
                "rekomendasi yang sesuai untuk meningkatkan kinerja atau mengatasi masalah yang terdeteksi dalam data. Sertakan konteks bisnis atau industri yang relevan dalam analisis Anda untuk memberikan rekomendasi yang dapat diimplementasikan secara praktis.",
         height=150,
