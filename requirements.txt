@@ -9,6 +9,7 @@ protobuf==5.28.3
 Requests==2.32.3
 scikit_learn==1.5.2
 seaborn==0.13.2
+shap==0.46.0
 statsmodels==0.14.4
 streamlit==1.39.0
 streamlit_cookies_controller==0.0.4

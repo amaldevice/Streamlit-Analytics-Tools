@@ -13,6 +13,8 @@ import google.generativeai as genai
 import shap
 import os
 
+
+# Akses API
 openai_api_key = st.secrets["OPENAI_API_KEY"]
 gemini_api_key = st.secrets["GEMINI_API_KEY"]
 # Konfigurasi OpenAI
