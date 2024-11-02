@@ -1,11 +1,11 @@
-google-generativeai==0.8.3
+google-generativeai
 matplotlib
 numpy
 openai==1.52.2
 openpyxl==3.1.2
 pandas==2.2.3
 Pillow
-protobuf==5.28.3
+protobuf
 Requests==2.32.3
 scikit_learn==1.5.2
 seaborn==0.13.2
@@ -13,5 +13,5 @@ statsmodels==0.14.4
 streamlit==1.39.0
 streamlit_cookies_controller==0.0.4
 streamlit_cookies_manager==0.2.0
-tensorflow==2.17.0
-xgboost==2.1.2
+tensorflow
+xgboost
