@@ -10,16 +10,20 @@ from streamlit_cookies_manager import EncryptedCookieManager
 from streamlit_cookies_controller import CookieController
 import warnings
 warnings.filterwarnings("ignore")
-from data_plot import plot_correlation, plot_distribution, plot_countplot, plot_countplot_categoric, plot_aggregasi_data, plot_ai_interpretation
+from data_plot import (plot_correlation, plot_distribution,
+                       plot_countplot, plot_countplot_categoric,
+                       plot_aggregasi_data, plot_ai_interpretation,
+                       plot_shap_plot)
 from data_describe import display_statistics
 from data_cleaning import (display_data, read_file, clean_data, 
                            format_date_columns, time_series_formatting,
                            handle_upload, handle_data_cleaning, handle_date_formatting,
                            handle_time_series_formatting)
 from data_prep import (diff_data,line_plot, plot_statistik, uji_stasioner,
-                       time_series_split, splitting_plot, handle_time_series_split, handle_plot_statistik)
-from modelling import handle_model_training, train_model_timeseries, evaluate_plot_model_results
-
+                       time_series_split, splitting_plot, handle_time_series_split,
+                       handle_plot_statistik, regression_formatting, handle_regression_formatting)
+from modelling import (handle_model_training, train_model_timeseries, evaluate_plot_model_results,
+                       train_model_regresi, input_new_data, predict_new_data)
 
 controller = CookieController()
 
@@ -88,27 +92,16 @@ def handle_callback():
 def sudahLogin():
     cookie = controller.get('user_info')
     if cookie:
-        user_info = (cookie)
+        if isinstance(cookie, dict):
+            user_info = cookie  # Directly use the dictionary
+        else:
+            user_info = json.loads(cookie)  # Parsing JSON string ke dictionary
         st.write(f"Selamat datang, {user_info.get('nama', 'Pengguna')}!")
         st.write(f"Email: {user_info.get('email', 'Tidak ada email')}")
+
         if st.button("Logout"):
             controller.remove('user_info')
             st.rerun()  # Ganti dengan st.rerun() yang baru
-
-def main():
-    st.title("Streamlit SSO dengan Auth0")
-    cookie = controller.get('user_info')
-    if not cookie:
-        user_info = handle_callback()
-        if user_info:
-            sudahLogin()
-            
-            
-        else : 
-            login()
-        
-    else:
-        sudahLogin()
 
         st.header("Selamat Datang di Tools Analisis Data & Peramalan  Pentagon Dinas Kominfotik Gorontalo")
 
@@ -162,39 +155,85 @@ def main():
 
         lanjut = st.radio("Apakah Anda ingin melanjutkan ke tahap peramalan?", ('Ya', 'Tidak'), index=None)
         if lanjut == 'Ya':
-            st.header("Tahap Peramalan")
+            methods = st.radio("Pilih Metode Peramalan", ('Time Series', 'Regression'), index=None)
+            if methods == 'Time Series':
+                st.header("Peramalan Berderet Waktu")
 
-            # Format Data Tanggal
-            df, freq = handle_date_formatting(df)
-        
-            # Format Data Time Series
-            df = handle_time_series_formatting(df)
+                # Format Data Tanggal
+                df, freq = handle_date_formatting(df)
+            
+                # Format Data Time Series
+                df = handle_time_series_formatting(df)
 
-            # Plot Data
-            line_plot(df)
+                # Plot Data
+                line_plot(df)
 
-            # Uji Statistik
-            handle_plot_statistik(df)
+                # Uji Statistik
+                handle_plot_statistik(df)
 
-            # Uji Stasioneritas
-            uji_stasioner(df)
+                # Uji Stasioneritas
+                uji_stasioner(df)
 
-            # Differencing
-            df = diff_data(df)
+                # Differencing
+                df = diff_data(df)
 
-            # Data Preparation
-            train, test = handle_time_series_split(df)
+                # Data Preparation
+                train, test = handle_time_series_split(df)
 
-            st.write(train.head())
-            st.write(test.tail())
-            # Modelling
-            handle_model_training(train, test, freq)
+                st.write(train.head())
+                st.write(test.tail())
+                # Modelling
+                handle_model_training(train, test, freq)
+            elif methods == 'Regression':
+                st.header("Peramalan dengan Regresi")
+
+                X_train, X_test, y_train, y_test, X, y = handle_regression_formatting(df)
+
+                model, y_pred, mse, mae, rmse, mape, r2 = train_model_regresi(X_train, X_test, y_train, y_test)
+
+                shap_plot = plot_shap_plot(model, X_test)
+                if shap_plot:
+                    plot_ai_interpretation(shap_plot, 'shap')
+                
+                st.write(f"Mean Squared Error (MSE) : {mse:.2f}")
+                st.write(f"Mean Absolute Error (MAE) : {mae:.2f}")
+                st.write(f"Root Mean Squared Error (RMSE) : {rmse:.2f}")
+                st.write(f"Mean Absolute Percentage Error (MAPE) : {mape:.2f}")
+                st.write(f"R2 Score : {r2:.2f}")
+
+                new_data = input_new_data(df, X)
+
+                predict_new_data(model, new_data)
+
+
+            else:
+                st.warning("Pilih metode Prediksi.")
+                st.stop()
         elif lanjut == 'Tidak':
             st.write("Analisis Selesai")
+            if st.button("Logout"):
+                controller.remove('user_info')
+                st.rerun()  # Ganti dengan st.rerun() yang baru
             st.stop()
         else:
             st.warning("Pilih opsi untuk melanjutkan atau tidak.")
             st.stop()
+
+
+def main():
+    st.title("Streamlit SSO dengan Auth0")
+    cookie = controller.get('user_info')
+    if not cookie:
+        user_info = handle_callback()
+        if user_info:
+            sudahLogin()
+            
+        else : 
+            login()
+        
+    else:
+        sudahLogin()
+        
 
 if __name__ == '__main__':
     main()

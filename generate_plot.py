@@ -10,11 +10,15 @@ import base64
 import openai
 from openai import OpenAI
 import google.generativeai as genai
+import shap
+import os
 
+openai_api_key = st.secrets["OPENAI_API_KEY"]
+gemini_api_key = st.secrets["GEMINI_API_KEY"]
 # Konfigurasi OpenAI
-client = OpenAI(api_key='sk-Q9EnJHuYEL1ywyo5s59RW7UM0l9RjvrPXZe4FEQmHYT3BlbkFJRzVpHcwRSVoLIAt4p6zg_BI2LLBT8G9TzZK1bXsHMA')
+client = OpenAI(api_key=openai_api_key)
 # Konfigurasi Google Generative AI
-genai.configure(api_key="AIzaSyDQfpY0Oo-Qv_V1szhqXKSfAedCKA1czTc")
+genai.configure(api_key=gemini_api_key)
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 @st.cache_data
@@ -32,7 +36,7 @@ def generate_distribution_plot(df, column):
 def generate_plot_correlation(df):
     """Plot and display correlation heatmap."""
     plt.figure(figsize=(12, 10))
-    sns.heatmap(df.corr(), annot=True, cmap='coolwarm')
+    sns.heatmap(df.corr(), annot=True, cmap='coolwarm', fmt='.2f')  # Adjust color bar and annotation size
     img_buffer = io.BytesIO()
     plt.savefig(img_buffer, format='png')
     img_buffer.seek(0)
@@ -126,6 +130,31 @@ def generate_aggregasi_plot(df, columns, jenis_aggregasi):
     # Atur layout dan simpan plot ke buffer
     plt.tight_layout()
     img_buffer = io.BytesIO()
+    plt.savefig(img_buffer, format='png')
+    plt.close()
+    img_buffer.seek(0)
+    return img_buffer
+
+@st.cache_data
+def generate_shap_plot(_model, X_test):
+    """
+    Generate SHAP summary plot for feature importance in the model using X_test and return as image buffer.
+    """
+    # Extract the trained regressor from the model pipeline
+    regressor = _model.named_steps['regressor']
+    
+    # Preprocess X_test using the same pipeline (to apply transformations)
+    X_test_transformed = _model.named_steps['preprocessor'].transform(X_test)
+    
+    # Create SHAP explainer and calculate SHAP values
+    explainer = shap.Explainer(regressor, X_test_transformed)
+    shap_values = explainer(X_test_transformed)
+    
+    # Generate summary plot
+    img_buffer = io.BytesIO()
+    plt.figure()
+    shap.summary_plot(shap_values, features=X_test_transformed,
+                      feature_names=X_test.columns, show=False)
     plt.savefig(img_buffer, format='png')
     plt.close()
     img_buffer.seek(0)

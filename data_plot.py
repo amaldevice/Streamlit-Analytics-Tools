@@ -8,7 +8,10 @@ import io
 import PIL.Image
 import streamlit as st
 import base64
-from generate_plot import generate_distribution_plot, generate_countplot, generate_countplot_categoric, generate_aggregasi_plot, generate_ai_interpret, generate_plot_correlation
+from generate_plot import (generate_distribution_plot, generate_countplot,
+                           generate_countplot_categoric, generate_aggregasi_plot,
+                           generate_ai_interpret, generate_plot_correlation,
+                           generate_shap_plot)
 
 
 def plot_correlation(df):
@@ -186,6 +189,28 @@ def plot_aggregasi_data(df, all_columns):
 
     else:
         st.warning("Pilih opsi untuk melihat aggregasi data.")
+        st.stop()
+
+def plot_shap_plot(model, X_test):
+    """Handle user interaction for SHAP plot generation and return image buffer if plotted."""
+    shap_plot = st.radio("Apakah Anda ingin melihat SHAP plot untuk model?", ('Ya', 'Tidak'), index=None)
+
+    if shap_plot == 'Ya':
+        st.header("SHAP Plot")
+        st.write("SHAP (SHapley Additive exPlanations) adalah teknik yang digunakan untuk menjelaskan prediksi model Machine Learning dengan cara memperhitungkan kontribusi setiap fitur/variabel independen terhadap prediksi model.")
+        st.write("SHAP plot menunjukkan bagaimana setiap fitur/variabel mempengaruhi prediksi model. Fitur yang berwarna biru menunjukkan nilai rendah, sedangkan fitur yang berwarna merah menunjukkan nilai tinggi.")
+        st.write("SHAP value adalah nilai yang menunjukkan seberapa besar pengaruh suatu fitur terhadap prediksi model. Nilai positif menunjukkan pengaruh positif, sedangkan nilai negatif menunjukkan pengaruh negatif.")
+
+        # Panggil fungsi generate_shap_plot untuk mendapatkan buffer gambar
+        shap_img = generate_shap_plot(model, X_test)
+        # Tampilkan gambar menggunakan st.image
+        st.image(shap_img, caption='SHAP Plot')
+        return shap_img
+    elif shap_plot == 'Tidak':
+        st.write("SHAP plot tidak divisualisasikan.")
+        return None
+    else:
+        st.warning("Pilih opsi untuk melihat SHAP plot.")
         st.stop()
 
 def plot_ai_interpretation(img_buffer, identifier):

@@ -267,4 +267,51 @@ def handle_time_series_split(df):
     
     return train, test
 
+@st.cache_data
+def regression_formatting(df, X, y):
+    """
+    Format data untuk analisis regresi.
+
+    Parameters:
+    df (pd.DataFrame): DataFrame yang akan diformat.
+
+    Returns:
+    X_train, X_test, y_train, y_test (pd.DataFrame): Data yang sudah diformat
+    """
+    X_train, X_test, y_train, y_test = train_test_split(df[X], df[y], test_size=0.2, random_state=0, shuffle=True)
+    return X_train, X_test, y_train, y_test
+
+
+def handle_regression_formatting(df):
+    """
+    Menangani proses formatting data untuk analisis regresi.
+
+    Parameters:
+    df (pd.DataFrame): DataFrame yang akan diformat.
+
+    Returns:
+    X_train, X_test, y_train, y_test (pd.DataFrame): Data yang sudah diformat
+    """
+    st.header("Format Data untuk Regresi")
+    
+    # Pilih variabel independen
+    X = st.multiselect("Pilih variabel independen untuk prediksi :", df.columns, default=None, key='X')
+    if X:
+        st.write(f"Variabel independen untuk prediksi adalah : {X}")
+    else:
+        st.warning("Pilih variabel independen untuk prediksi.")
+        st.stop()
+    
+    # Pilih variabel dependen
+    y = st.selectbox("Pilih variabel dependen/target prediksi :", df.columns, index=None)
+    if y:
+        st.write(f"Variabel dependen/target prediksi adalah : {y}")
+    else:
+        st.warning("Pilih variabel dependen/target prediksi.")
+        st.stop()
+    
+    # Format data
+    X_train, X_test, y_train, y_test = regression_formatting(df, X, y)
+    
+    return X_train, X_test, y_train, y_test, X, y
     

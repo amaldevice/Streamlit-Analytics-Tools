@@ -2,84 +2,103 @@ import pandas as pd
 import numpy as np  
 import streamlit as st
 import io
+import requests
+from io import BytesIO
 
 @st.cache_data
-def read_file(uploaded_file, separator=',', sheet_name=None):
-    """Membaca file CSV, TSV, atau Excel dan mengembalikan DataFrame."""
+def read_file(uploaded_file=None, separator=',', sheet_name=None, api_url=None):
+    """
+    Reads a CSV, TSV, or Excel file or fetches data from an API, returning a DataFrame.
+    """
     try:
-        filename = uploaded_file.name.lower()
-        if filename.endswith('.csv'):
-            df = pd.read_csv(uploaded_file, sep=separator)
+        if api_url:
+            # Fetch data from the API
+            response = requests.get(api_url)
+            response.raise_for_status()
+            # Assume CSV format with specified separator
+            df = pd.read_csv(BytesIO(response.content), sep=separator)
             return df
-        elif filename.endswith('.tsv'):
-            df = pd.read_csv(uploaded_file, sep='\t')
-            return df
-        elif filename.endswith('.xlsx'):
-            if sheet_name is None:
-                excel_file = pd.ExcelFile(uploaded_file)
-                sheet_name = excel_file.sheet_names[0]  # Default ke sheet pertama
-            df = pd.read_excel(uploaded_file, sheet_name=sheet_name)
-            return df
+        elif uploaded_file:
+            # Handle uploaded file
+            filename = uploaded_file.name.lower()
+            if filename.endswith('.csv'):
+                df = pd.read_csv(uploaded_file, sep=separator)
+                return df
+            elif filename.endswith('.tsv'):
+                df = pd.read_csv(uploaded_file, sep='\t')
+                return df
+            elif filename.endswith('.xlsx'):
+                if sheet_name is None:
+                    excel_file = pd.ExcelFile(uploaded_file)
+                    sheet_name = excel_file.sheet_names[0]  # Default to first sheet
+                df = pd.read_excel(uploaded_file, sheet_name=sheet_name)
+                return df
+            else:
+                st.error("Unsupported file format!")
+                return None
         else:
-            st.error("Format file tidak didukung!")
+            st.warning("No file or API URL provided.")
             return None
     except Exception as e:
-        st.error(f"Error membaca file: {e}")
+        st.error(f"Error reading data: {e}")
         return None
 
 def handle_upload():
     """
-    Menangani proses upload file, termasuk pemilihan separator atau sheet.
-    Mengembalikan DataFrame jika berhasil, atau None jika gagal.
+    Manages file upload and API data fetching, including separator or sheet selection.
+    Returns a DataFrame if successful, or None if it fails.
     """
-    uploaded_file = st.file_uploader("Upload file CSV, TSV, atau Excel", type=['csv', 'xlsx', 'tsv'])
-    if uploaded_file is not None:
-        filename = uploaded_file.name.lower()
-        file_extension = filename.split('.')[-1]
+    data_source = st.selectbox("Select data source:", ["Upload File", "Fetch from API"], index=0)
+    
+    if data_source == "Upload File":
+        uploaded_file = st.file_uploader("Upload a CSV, TSV, or Excel file", type=['csv', 'xlsx', 'tsv'])
+        if uploaded_file:
+            filename = uploaded_file.name.lower()
+            file_extension = filename.split('.')[-1]
 
-        if file_extension in ['csv', 'tsv']:
-            # Tentukan separator berdasarkan jenis file
-            if file_extension == 'csv':
-                separator = st.text_input(
-                    "Masukkan separator yang digunakan dalam file CSV (misalnya, ',' atau ';')",
-                    value=','
-                )
-            else:
-                separator = '\t'
-
-            df = read_file(uploaded_file, separator=separator)
-
-            if df is not None:
-                st.success("File berhasil dibaca!")
-                return df
-        
-        elif file_extension == 'xlsx':
-            excel_file = pd.ExcelFile(uploaded_file)
-            sheet_names = excel_file.sheet_names
-
-            if not sheet_names:
-                st.error("Tidak ada sheet yang ditemukan dalam file Excel.")
-                return None
-
-            sheet_name = st.selectbox("Pilih nama sheet yang akan digunakan:", sheet_names, index=None)
-
-            if sheet_name:
-                df = read_file(uploaded_file, sheet_name=sheet_name)
-
+            if file_extension in ['csv', 'tsv']:
+                separator = ',' if file_extension == 'csv' else '\t'
+                separator = st.text_input("Enter separator used in the file:", value=separator)
+                df = read_file(uploaded_file=uploaded_file, separator=separator)
                 if df is not None:
-                    st.success("File Excel berhasil dibaca!")
+                    st.success("File successfully read!")
                     return df
+            elif file_extension == 'xlsx':
+                excel_file = pd.ExcelFile(uploaded_file)
+                sheet_names = excel_file.sheet_names
+                if not sheet_names:
+                    st.error("No sheets found in the Excel file.")
+                    return None
+                sheet_name = st.selectbox("Select the sheet to use:", sheet_names)
+                if sheet_name:
+                    df = read_file(uploaded_file=uploaded_file, sheet_name=sheet_name)
+                    if df is not None:
+                        st.success("Excel file successfully read!")
+                        return df
             else:
-                st.warning("Silakan pilih nama sheet yang akan digunakan.")
+                st.error("Unsupported file format!")
                 return None
-        
         else:
-            st.error("Format file tidak didukung!")
+            st.info("Please upload a CSV, TSV, or Excel file.")
             return None
     
+    elif data_source == "Fetch from API":
+        api_url = st.text_input("Enter the API URL:")
+        if api_url:
+            st.info(f"Fetching data from API: {api_url}")
+            df = read_file(api_url=api_url)
+            if df is not None:
+                st.success("Data successfully fetched from API!")
+                return df
+            else:
+                st.error("Failed to fetch data from API.")
+                return None
+        else:
+            st.warning("Please enter a valid API URL.")
+            return None
     else:
-        st.info("Silakan upload file CSV, TSV, atau Excel.")
-        return None
+        st.warning("Please select a data source.")
+        st.stop()
 
 @st.cache_data
 def display_data(df):

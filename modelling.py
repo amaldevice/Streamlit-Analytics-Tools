@@ -5,6 +5,11 @@ import math
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, mean_absolute_error, r2_score
 from sklearn.preprocessing import MinMaxScaler
+from xgboost import XGBRegressor
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, OneHotEncoder, LabelEncoder
+from sklearn.impute import SimpleImputer
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM
 import math
@@ -251,3 +256,72 @@ def handle_model_training(train, test, freq):
     """
     y_true, y_pred, forecast_series = train_model_timeseries(train, test, freq)
     evaluate_plot_model_results(pd.Series(train, index=train.index), y_true, y_pred, forecast_series)
+
+@st.cache_data
+def train_model_regresi(X_train, X_test, y_train, y_test):
+    """
+    Train regression model and evaluate on test data.
+    """
+    # Preprocessing
+    numeric_features = X_train.select_dtypes(include=['int64', 'float64']).columns
+    categorical_features = X_train.select_dtypes(include=['object']).columns
+
+    numeric_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='mean')),
+        ('scaler', MinMaxScaler())
+    ])
+
+    categorical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
+        ('onehot', OneHotEncoder(handle_unknown='ignore'))
+    ])
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', numeric_transformer, numeric_features),
+            ('cat', categorical_transformer, categorical_features)
+        ])
+
+    model = Pipeline(steps=[('preprocessor', preprocessor),
+                            ('regressor', XGBRegressor(n_estimators=5000, learning_rate=0.1, random_state=0, n_jobs=-1, objective='reg:squarederror', max_depth=5))])
+
+    model.fit(X_train, y_train)
+
+    y_pred = model.predict(X_test)
+
+    mse = mean_squared_error(y_test, y_pred)
+    rmse = math.sqrt(mse)
+    mae = mean_absolute_error(y_test, y_pred)
+    mape = mean_absolute_percentage_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
+
+    return model, y_pred, mse, mae, rmse, mape, r2
+
+def input_new_data(df, X):
+    """
+    Create input form for new data prediction.
+
+    """
+    st.subheader("Masukkan Data baru untuk Prediksi ")
+    with st.form(key='prediction_form'):
+        input_data = {}
+        for feature in X:
+            if df[feature].dtype == 'object':
+                input_val = st.text_input(f"{feature} (string)")
+            else:
+                input_val = st.number_input(f"{feature} (numeric)", value=0.0)
+            input_data[feature] = input_val
+        submit_button = st.form_submit_button(label='Prediksi')
+
+        if submit_button:
+            input_df = pd.DataFrame([input_data])
+            return input_df
+
+        else:
+            st.stop()
+
+def predict_new_data(model, input_df):
+
+    prediction = model.predict(input_df)
+    return st.success(f"Prediksi: {prediction[0]:.2f}")
+
