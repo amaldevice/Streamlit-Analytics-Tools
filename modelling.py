@@ -13,9 +13,10 @@ from sklearn.impute import SimpleImputer
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM
 import math
+import io
 
 # --------------------- LSTM Model Function ---------------------
-    
+
 def train_lstm_model(train, test, freq=None):
     st.subheader("Pengaturan LSTM")
     
@@ -32,10 +33,10 @@ def train_lstm_model(train, test, freq=None):
     
     # Step 2: Sequence creation
     sequence_length = st.number_input(
-        "Masukkan panjang sequence:", 
+        "Masukkan panjang sequence (menentukan seberapa banyak data sebelumnya yang dilihat oleh model saat membuat prediksi):", 
         min_value=1, 
         step=1,
-        help="Panjang sequence diperlukan untuk LSTM.",
+        help="Panjang sequence diperlukan untuk LSTM (menentukan seberapa banyak data sebelumnya yang dilihat oleh model saat membuat prediksi).",
         value=None
     )
     if not sequence_length:
@@ -55,10 +56,10 @@ def train_lstm_model(train, test, freq=None):
     
     # Mapping frekuensi ke label forecast_horizon
     freq_label_map = {
-        'Harian': "jumlah hari untuk forecasting:",
-        'Bulanan': "jumlah bulan untuk forecasting:",
-        'Triwulan': "jumlah triwulan untuk forecasting:",
-        'Tahunan': "jumlah tahun untuk forecasting:"
+        'Harian': "jumlah hari untuk peramalan:",
+        'Bulanan': "jumlah bulan untuk peramalan:",
+        'Triwulan': "jumlah triwulan untuk peramalan:",
+        'Tahunan': "jumlah tahun untuk peramalan:"
     }
     forecast_label = "Masukkan " + freq_label_map.get(freq, "jumlah periode untuk forecasting:")
     
@@ -171,7 +172,7 @@ def train_model_timeseries(train, test, freq):
     """
     Train LSTM time series model and forecast future values.
     """
-    st.header("Training Model Peramalan dengan LSTM")
+    st.header("Melatih Model Peramalan dengan LSTM")
 
     y_pred, forecast_series = train_lstm_model(train, test, freq)
 
@@ -193,11 +194,28 @@ def train_model_timeseries(train, test, freq):
         st.stop()
 
     st.subheader("Hasil Evaluasi Model")
-    st.write(f"MSE: {mse:.4f}")
-    st.write(f"RMSE: {rmse:.4f}")
-    st.write(f"MAE: {mae:.4f}")
-    st.write(f"MAPE: {mape:.4f}%")
-    st.write(f"R²: {r2:.4f}")
+    # Penjelasan formal untuk setiap metrik
+    st.write(f"1. Mean Squared Error (MSE): {mse:.2f}")
+    st.write("   MSE mengukur rata-rata kesalahan dengan mengkuadratkan selisih antara nilai prediksi dan nilai aktual. ")
+    st.write("   Nilai yang lebih rendah menunjukkan bahwa rata-rata kesalahan model lebih kecil, yang berarti prediksi lebih dekat ke nilai sebenarnya.\n")
+
+    st.write(f"2. Mean Absolute Error (MAE): {mae:.2f}")
+    st.write("   MAE menghitung rata-rata dari nilai absolut selisih antara prediksi dan nilai aktual.")
+    st.write("   Ini menunjukkan seberapa besar rata-rata kesalahan tanpa memperhitungkan arah kesalahan (terlalu tinggi atau rendah).")
+    st.write("   Nilai MAE yang rendah menunjukkan bahwa prediksi rata-rata cukup dekat dengan nilai aktual.\n")
+
+    st.write(f"3. Root Mean Squared Error (RMSE): {rmse:.2f}")
+    st.write("   RMSE adalah akar kuadrat dari MSE, yang mengembalikan kesalahan pada skala yang sama dengan data asli.")
+    st.write("   Metrik ini berguna untuk interpretasi langsung dalam satuan asli data, dengan nilai yang lebih rendah menunjukkan akurasi yang lebih tinggi.\n")
+
+    st.write(f"4. Mean Absolute Percentage Error (MAPE): {mape:.2f}%")
+    st.write("   MAPE mengukur kesalahan dalam bentuk persentase rata-rata, sehingga memudahkan pemahaman kesalahan relatif terhadap nilai aktual.")
+    st.write("   MAPE cocok untuk mengetahui seberapa besar rata-rata kesalahan model dalam konteks persentase dari nilai aktual.\n")
+
+    st.write(f"5. R² Score: {r2:.2f}")
+    st.write("   R², atau koefisien determinasi, mengukur seberapa baik model menjelaskan variasi dalam data.")
+    st.write("   Nilai yang mendekati 1 menunjukkan bahwa model mampu menjelaskan sebagian besar variasi dalam data.")
+    st.write("   Nilai ini adalah indikator seberapa cocok model dalam memberikan prediksi yang akurat.")
 
     return y_true, y_pred, forecast_series
 
@@ -205,57 +223,73 @@ def train_model_timeseries(train, test, freq):
 
 def evaluate_plot_model_results(train, y_test, y_pred, forecast_series):
     """
-    Plot actual vs predicted and residuals, and show forecasted values.
+    Plot actual vs predicted and residuals, and show forecasted values,
+    and return the plots as img_buffer for further interpretation.
     """
     st.header("Evaluasi dan Visualisasi Hasil Model")
 
+    # List untuk menyimpan buffer gambar dari setiap plot
+    img_buffers = []
+
     # Plot Keseluruhan Data
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(train.index, train.values, label='Train')
-    ax.plot(y_test.index, y_test, label='Test')
-    ax.plot(y_test.index, y_pred, label='Predicted')
-    ax.plot(forecast_series.index, forecast_series.values, label='Forecast', linestyle='--')
-    ax.set_title('Train, Test, Predicted, dan Forecast')
+    ax.plot(train.index, train.values, label='Data Pelatihan')
+    ax.plot(y_test.index, y_test, label='Data Testing')
+    ax.plot(y_test.index, y_pred, label='Data Hasil Prediksi')
+    ax.plot(forecast_series.index, forecast_series.values, label='Data Hasil Peramalan', linestyle='--')
+    ax.set_title('Data Keseluruhan & Hasil Prediksi')
     ax.grid(True)
     ax.legend()
+    # Simpan gambar dalam buffer
+    img_buffer = io.BytesIO()
+    fig.savefig(img_buffer, format='png')
+    img_buffer.seek(0)
+    img_buffers.append(img_buffer)
     st.pyplot(fig)
+    plt.close(fig)
 
     # Plot Actual vs Predicted
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(y_test.index, y_test, label='Actual')
-    ax.plot(y_test.index, y_pred, label='Predicted')
-    ax.set_title('Actual vs Predicted')
+    ax.plot(y_test.index, y_test, label='Data Asli')
+    ax.plot(y_test.index, y_pred, label='Data Hasil Prediksi', linestyle='--')
+    ax.set_title('Perbandingan Data Asli dan Data Hasil Prediksi')
     ax.grid(True)
     ax.legend()
+    # Simpan gambar dalam buffer
+    img_buffer = io.BytesIO()
+    fig.savefig(img_buffer, format='png')
+    img_buffer.seek(0)
+    img_buffers.append(img_buffer)
     st.pyplot(fig)
+    plt.close(fig)
 
     # Plot Forecasted Values
-    st.subheader("Forecasting untuk Waktu Mendatang")
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(forecast_series.index, forecast_series.values, label='Forecast', color='orange')
-    ax.set_title('Forecasted Values')
+    ax.plot(forecast_series.index, forecast_series.values, label='Nilai Peramalan', color='orange')
+    ax.set_title(f'Hasil Peramalan Untuk {forecast_series.index.min().date()} - {forecast_series.index.max().date()}')
     ax.grid(True)
     ax.legend()
+    # Simpan gambar dalam buffer
+    img_buffer = io.BytesIO()
+    fig.savefig(img_buffer, format='png')
+    img_buffer.seek(0)
+    img_buffers.append(img_buffer)
     st.pyplot(fig)
+    plt.close(fig)
 
-    # Plot Residuals
-    residuals = y_test - y_pred
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(y_test.index, residuals, label='Residuals')
-    ax.hlines(0, y_test.index.min(), y_test.index.max(), colors='r', linestyles='dashed')
-    ax.set_title('Residuals')
-    ax.grid(True)
-    ax.legend()
-    st.pyplot(fig)
+    # Mengembalikan list berisi buffer dari semua gambar
+    return img_buffers
+
 
 # --------------------- Handler Function ---------------------
-
+@st.cache_data
 def handle_model_training(train, test, freq):
     """
     Handle model training, forecasting, and evaluation.
     """
     y_true, y_pred, forecast_series = train_model_timeseries(train, test, freq)
-    evaluate_plot_model_results(pd.Series(train, index=train.index), y_true, y_pred, forecast_series)
+    img = evaluate_plot_model_results(pd.Series(train, index=train.index), y_true, y_pred, forecast_series)
+    return img
 
 @st.cache_data
 def train_model_regresi(X_train, X_test, y_train, y_test):

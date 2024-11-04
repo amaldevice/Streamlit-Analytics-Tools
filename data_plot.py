@@ -11,7 +11,7 @@ import base64
 from generate_plot import (generate_distribution_plot, generate_countplot,
                            generate_countplot_categoric, generate_aggregasi_plot,
                            generate_ai_interpret, generate_plot_correlation,
-                           generate_shap_plot)
+                           generate_shap_plot, generate_ai_interpret_multiple_plots)
 
 
 def plot_correlation(df):
@@ -272,4 +272,65 @@ def plot_ai_interpretation(img_buffer, identifier):
 
     # Tombol untuk memulai interpretasi AI
     interpretation = generate_ai_interpret(ai_choice, system_prompt, user_prompt, img_buffer)
+    st.write(interpretation)
+
+def multiplot_ai_interpretation(img_buffer, identifier):
+    """
+    Handle user interaction for AI interpretation and display the result.
+
+    Parameters:
+        img_buffer (BytesIO): Image buffer containing the plot to be interpreted.
+
+    Returns:
+        interpretation (str): AI interpretation hasil dari proses AI.
+    """
+    st.header("Interpretasi AI")
+
+    # Form untuk input pengguna
+    ai_choice = st.selectbox(
+        "Pilih AI yang akan digunakan:",
+        ['Google Gemini', 'OpenAI ChatGPT'],
+        key=identifier + '_ai_choice',
+        index=None
+    )
+
+    if ai_choice:
+        st.success(f"AI yang dipilih: {ai_choice}")
+    else:
+        st.warning("Silakan pilih AI yang akan digunakan.")
+        st.stop()
+
+    system_prompt = st.text_area(
+        "Masukkan peran sistem (System Role):",
+        value="",
+        help = "Anda adalah seorang senior data analyst dengan keahlian dalam interpretasi visualisasi data dan memberikan insight serta rekomendasi "
+               "yang relevan. Berdasarkan visualisasi yang diberikan, Anda akan mengidentifikasi tren, pola, atau anomali utama. Kemudian, Anda akan memberikan insight mendalam terkait hasil tersebut serta menyarankan langkah-langkah strategis atau "
+               "rekomendasi yang sesuai untuk meningkatkan kinerja atau mengatasi masalah yang terdeteksi dalam data. Sertakan konteks bisnis atau industri yang relevan dalam analisis Anda untuk memberikan rekomendasi yang dapat diimplementasikan secara praktis.",
+        height=150,
+        key = identifier + '_system_prompt'
+    )
+
+    if system_prompt:
+        st.success("Peran sistem telah dimasukkan.")
+    else:
+        st.warning("Silakan masukkan peran sistem.")
+        st.stop()
+
+    user_prompt = st.text_area(
+        "Masukkan prompt pengguna (User Prompt):",
+        value="",
+        help = "Berdasarkan hasil analisis plot di atas, insight apa yang dapat diperoleh dari pola yang terlihat dan hubungan antar variabel? "
+               "Berikan rekomendasi tindakan yang dapat diambil serta langkah-langkah selanjutnya berdasarkan temuan tersebut. Buatkan penjelasannya dalam bahasa indonesia.",
+        height=150,
+        key = identifier + '_user_prompt'
+    )
+
+    if user_prompt:
+        st.success("Prompt pengguna telah dimasukkan.")
+    else:
+        st.warning("Silakan masukkan prompt pengguna.")
+        st.stop()
+
+    # Tombol untuk memulai interpretasi AI
+    interpretation = generate_ai_interpret_multiple_plots(ai_choice, system_prompt, user_prompt, img_buffer)
     st.write(interpretation)

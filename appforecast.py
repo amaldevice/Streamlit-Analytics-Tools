@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore")
 from data_plot import (plot_correlation, plot_distribution,
                        plot_countplot, plot_countplot_categoric,
                        plot_aggregasi_data, plot_ai_interpretation,
-                       plot_shap_plot)
+                       plot_shap_plot, multiplot_ai_interpretation)
 from data_describe import display_statistics
 from data_cleaning import (display_data, read_file, clean_data, 
                            format_date_columns, time_series_formatting,
@@ -107,7 +107,11 @@ def main():
             st.write(train.head())
             st.write(test.tail())
             # Modelling
-            handle_model_training(train, test, freq)
+            img = handle_model_training(train, test, freq)
+            if img:
+                multiplot_ai_interpretation(img, 'timeseries')
+                
+
         elif methods == 'Regression':
             st.header("Peramalan dengan Regresi")
 
@@ -115,20 +119,37 @@ def main():
 
             model, y_pred, mse, mae, rmse, mape, r2 = train_model_regresi(X_train, X_test, y_train, y_test)
 
+            # Penjelasan formal untuk setiap metrik
+            st.write(f"1. Mean Squared Error (MSE): {mse:.2f}")
+            st.write("   MSE mengukur rata-rata kesalahan dengan mengkuadratkan selisih antara nilai prediksi dan nilai aktual. ")
+            st.write("   Nilai yang lebih rendah menunjukkan bahwa rata-rata kesalahan model lebih kecil, yang berarti prediksi lebih dekat ke nilai sebenarnya.\n")
+
+            st.write(f"2. Mean Absolute Error (MAE): {mae:.2f}")
+            st.write("   MAE menghitung rata-rata dari nilai absolut selisih antara prediksi dan nilai aktual.")
+            st.write("   Ini menunjukkan seberapa besar rata-rata kesalahan tanpa memperhitungkan arah kesalahan (terlalu tinggi atau rendah).")
+            st.write("   Nilai MAE yang rendah menunjukkan bahwa prediksi rata-rata cukup dekat dengan nilai aktual.\n")
+
+            st.write(f"3. Root Mean Squared Error (RMSE): {rmse:.2f}")
+            st.write("   RMSE adalah akar kuadrat dari MSE, yang mengembalikan kesalahan pada skala yang sama dengan data asli.")
+            st.write("   Metrik ini berguna untuk interpretasi langsung dalam satuan asli data, dengan nilai yang lebih rendah menunjukkan akurasi yang lebih tinggi.\n")
+
+            st.write(f"4. Mean Absolute Percentage Error (MAPE): {mape:.2f}%")
+            st.write("   MAPE mengukur kesalahan dalam bentuk persentase rata-rata, sehingga memudahkan pemahaman kesalahan relatif terhadap nilai aktual.")
+            st.write("   MAPE cocok untuk mengetahui seberapa besar rata-rata kesalahan model dalam konteks persentase dari nilai aktual.\n")
+
+            st.write(f"5. R² Score: {r2:.2f}")
+            st.write("   R², atau koefisien determinasi, mengukur seberapa baik model menjelaskan variasi dalam data.")
+            st.write("   Nilai yang mendekati 1 menunjukkan bahwa model mampu menjelaskan sebagian besar variasi dalam data.")
+            st.write("   Nilai ini adalah indikator seberapa cocok model dalam memberikan prediksi yang akurat.")
+
+
             shap_plot = plot_shap_plot(model, X_test)
             if shap_plot:
                 plot_ai_interpretation(shap_plot, 'shap')
             
-            st.write(f"Mean Squared Error (MSE) : {mse:.2f}")
-            st.write(f"Mean Absolute Error (MAE) : {mae:.2f}")
-            st.write(f"Root Mean Squared Error (RMSE) : {rmse:.2f}")
-            st.write(f"Mean Absolute Percentage Error (MAPE) : {mape:.2f}")
-            st.write(f"R2 Score : {r2:.2f}")
-
             new_data = input_new_data(df, X)
 
             predict_new_data(model, new_data)
-
 
         else:
             st.warning("Pilih metode Prediksi.")

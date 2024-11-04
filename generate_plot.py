@@ -233,3 +233,74 @@ def generate_ai_interpret(ai_choice, system_prompt, user_prompt, img_buffer):
     except Exception as e:
         st.error(f"Error generating content: {e}")
         return None
+
+@st.cache_data
+def generate_ai_interpret_multiple_plots(ai_choice, system_prompt, user_prompt, img_buffers):
+    """
+    Fungsi untuk menghasilkan interpretasi menggunakan AI pilihan (OpenAI ChatGPT atau Google Gemini)
+    berdasarkan prompt sistem, prompt pengguna, dan visualisasi gambar-gambar yang telah diproses menjadi img_buffers.
+
+    Parameters:
+        ai_choice (str): Pilihan AI yang akan digunakan ('Google Gemini' atau 'OpenAI ChatGPT').
+        system_prompt (str): Prompt sistem yang berisi instruksi untuk AI.
+        user_prompt (str): Prompt pengguna yang mengajukan pertanyaan atau permintaan ke AI.
+        img_buffers (list): List berisi gambar visualisasi yang telah diproses dalam bentuk buffer.
+
+    Returns:
+        interpretation (str): Hasil interpretasi dari AI berdasarkan input yang diberikan.
+    """
+    try:
+        # Konversi setiap buffer gambar dalam img_buffers ke base64 atau format yang diterima oleh API
+        encoded_images = []
+        for img_buffer in img_buffers:
+            img_buffer.seek(0)  # Pastikan posisi buffer di awal
+            img_str = base64.b64encode(img_buffer.getvalue()).decode()
+            encoded_images.append(img_str)
+
+        # Proses jika menggunakan OpenAI ChatGPT
+        if ai_choice == 'OpenAI ChatGPT':
+            messages = [
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": user_prompt
+                }
+            ]
+            # Tambahkan setiap gambar sebagai input tambahan ke messages
+            for img_str in encoded_images:
+                messages.append({
+                    "role": "user",
+                    "content": {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{img_str}"
+                        }
+                    }
+                })
+            
+            # Panggilan ke OpenAI API (disesuaikan dengan konfigurasi OpenAI yang benar)
+            response = client.chat.completions.create(
+                model="gpt-4o",  # Pastikan menggunakan model OpenAI yang benar
+                messages=messages,
+                max_tokens=1000
+            )
+            interpretation = response.choices[0].message.content
+
+        # Proses jika menggunakan Google Gemini
+        elif ai_choice == 'Google Gemini':
+            # Contoh asumsi jika Google Gemini dapat menerima list gambar dalam img_buffers
+            # dan membutuhkan teks prompt secara bersamaan.
+            # Asumsi format pemanggilan Gemini API dengan gambar dan prompt gabungan
+            response = model.generate_content([
+                user_prompt, *[PIL.Image.open(BytesIO(base64.b64decode(img))) for img in encoded_images]
+            ])
+            response.resolve()  # Jika diperlukan, tunggu proses asinkron selesai
+            interpretation = response.text  # Asumsikan ini adalah teks respons dari Gemini
+
+        return st.write(interpretation)
+
+    except Exception as e:
+        st.error(f"Terjadi kesalahan saat memproses interpretasi: {e}")
