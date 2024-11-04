@@ -257,7 +257,6 @@ def handle_model_training(train, test, freq):
     y_true, y_pred, forecast_series = train_model_timeseries(train, test, freq)
     evaluate_plot_model_results(pd.Series(train, index=train.index), y_true, y_pred, forecast_series)
 
-@st.cache_data
 def train_model_regresi(X_train, X_test, y_train, y_test):
     """
     Train regression model and evaluate on test data.
