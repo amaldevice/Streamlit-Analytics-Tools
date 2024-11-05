@@ -64,7 +64,7 @@ def handle_upload():
     Manages file upload and API data fetching, including separator or sheet selection.
     Returns a DataFrame if successful, or None if it fails.
     """
-    data_source_options = ["Upload File", " Upload melalui API", "Ambil melalui API Open Data"]
+    data_source_options = ["Upload File", "Upload melalui API", "Ambil melalui API Open Data"]
     data_source = st.selectbox("Select data source:", data_source_options, index=0)
     
     if data_source == "Upload File":
