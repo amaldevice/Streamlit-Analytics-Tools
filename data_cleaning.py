@@ -43,12 +43,29 @@ def read_file(uploaded_file=None, separator=',', sheet_name=None, api_url=None):
         st.error(f"Error reading data: {e}")
         return None
 
+# Cache untuk mengambil data analisis dari API Open Data
+@st.cache_data
+def fetch_open_data_sources(api_data_analisis_url):
+    """
+    Fetches the list of available data sources from the Open Data API.
+    Returns a list of dictionaries with 'nama' and 'link'.
+    """
+    try:
+        response = requests.get(api_data_analisis_url)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("data", [])
+    except Exception as e:
+        st.error(f"Error fetching open data sources: {e}")
+        return []
+
 def handle_upload():
     """
     Manages file upload and API data fetching, including separator or sheet selection.
     Returns a DataFrame if successful, or None if it fails.
     """
-    data_source = st.selectbox("Select data source:", ["Upload File", "Fetch from API"], index=0)
+    data_source_options = ["Upload File", " Upload melalui API", "Ambil melalui API Open Data"]
+    data_source = st.selectbox("Select data source:", data_source_options, index=0)
     
     if data_source == "Upload File":
         uploaded_file = st.file_uploader("Upload a CSV, TSV, or Excel file", type=['csv', 'xlsx', 'tsv'])
@@ -57,11 +74,12 @@ def handle_upload():
             file_extension = filename.split('.')[-1]
 
             if file_extension in ['csv', 'tsv']:
-                separator = ',' if file_extension == 'csv' else '\t'
-                separator = st.text_input("Enter separator used in the file:", value=separator)
+                default_separator = ',' if file_extension == 'csv' else '\t'
+                separator = st.text_input("Enter separator used in the file:", value=default_separator)
                 df = read_file(uploaded_file=uploaded_file, separator=separator)
                 if df is not None:
                     st.success("File successfully read!")
+                    st.dataframe(df.head())
                     return df
             elif file_extension == 'xlsx':
                 excel_file = pd.ExcelFile(uploaded_file)
@@ -74,6 +92,7 @@ def handle_upload():
                     df = read_file(uploaded_file=uploaded_file, sheet_name=sheet_name)
                     if df is not None:
                         st.success("Excel file successfully read!")
+                        st.dataframe(df.head())
                         return df
             else:
                 st.error("Unsupported file format!")
@@ -89,12 +108,53 @@ def handle_upload():
             df = read_file(api_url=api_url)
             if df is not None:
                 st.success("Data successfully fetched from API!")
+                st.dataframe(df.head())
                 return df
             else:
                 st.error("Failed to fetch data from API.")
                 return None
         else:
             st.warning("Please enter a valid API URL.")
+            return None
+    
+    elif data_source == "Ambil melalui API Open Data":
+        # URL API Open Data untuk mendapatkan daftar data analisis
+        api_data_analisis_url = "https://opendata.gorontaloprov.go.id/api/data-analisis"
+        st.info("Fetching available data sources from Open Data API...")
+        data_sources = fetch_open_data_sources(api_data_analisis_url)
+        
+        if data_sources:
+            # Buat list nama data untuk selectbox
+            nama_data_list = [item["nama"] for item in data_sources]
+            selected_nama = st.selectbox("Pilih Nama Data yang ingin diambil:", nama_data_list)
+            
+            # Dapatkan link berdasarkan nama yang dipilih
+            selected_link = next((item["link"] for item in data_sources if item["nama"] == selected_nama), None)
+            
+            if selected_link:
+                st.info(f"Fetching data from: {selected_link}")
+                
+                # Tentukan separator berdasarkan ekstensi file
+                if selected_link.endswith('.csv'):
+                    separator = ','
+                elif selected_link.endswith('.tsv'):
+                    separator = '\t'
+                else:
+                    separator = ','  # Default separator
+                    
+                df = read_file(api_url=selected_link, separator=separator)
+                if df is not None:
+                    st.success(f"Data '{selected_nama}' berhasil diambil dari API Open Data!")
+                    st.dataframe(df.head())
+                    return df
+                else:
+                    st.error(f"Failed to fetch data '{selected_nama}' from API Open Data.")
+                    return None
+            else:
+                st.error("Link untuk data yang dipilih tidak ditemukan.")
+                return None
+        else:
+            st.error("Tidak ada data sumber yang tersedia dari API Open Data.")
             return None
     else:
         st.warning("Please select a data source.")

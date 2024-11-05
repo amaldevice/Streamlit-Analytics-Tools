@@ -92,26 +92,68 @@ def main():
             # Plot Data
             line_plot(df)
 
-            # Uji Statistik
-            handle_plot_statistik(df)
-
-            # Uji Stasioneritas
-            uji_stasioner(df)
-
-            # Differencing
-            df = diff_data(df)
-
             # Data Preparation
             train, test = handle_time_series_split(df)
 
             st.write(train.head())
             st.write(test.tail())
-            # Modelling
-            img = handle_model_training(train, test, freq)
+            # Sequence Length
+            sequence_length = st.number_input(
+                "Masukkan panjang sequence (menentukan seberapa banyak data sebelumnya yang dilihat oleh model saat membuat prediksi):", 
+                min_value=1, 
+                step=1,
+                help="Panjang sequence diperlukan untuk LSTM (menentukan seberapa banyak data sebelumnya yang dilihat oleh model saat membuat prediksi).",
+                value=None
+            )
+            if sequence_length:
+                pass
+            else:
+                st.warning("Masukkan panjang sequence.")
+                st.stop()
+
+            # Frequency Selection
+            freq = st.selectbox(
+                "Pilih frekuensi data:",
+                options=['Harian', 'Bulanan', 'Triwulan', 'Tahunan'],
+                help="Pilih frekuensi data yang sesuai dengan dataset Anda.",
+                index= None
+            )
+            if freq:
+                pass
+            else:
+                st.warning("Pilih frekuensi data.")
+                st.stop()
+
+            # Forecast Horizon
+            freq_label_map = {
+                'Harian': "jumlah hari untuk peramalan:",
+                'Bulanan': "jumlah bulan untuk peramalan:",
+                'Triwulan': "jumlah triwulan untuk peramalan:",
+                'Tahunan': "jumlah tahun untuk peramalan:"
+            }
+            forecast_label = "Masukkan " + freq_label_map.get(freq, "jumlah periode untuk forecasting:")
+            
+            forecast_horizon = st.number_input(
+                forecast_label,
+                min_value=1,
+                step=1,
+                help=f"Jumlah {freq.lower()} ke depan yang akan diprediksi.",
+                value=None
+            )
+            if forecast_horizon:
+                pass
+            else:
+                st.warning("Masukkan periode untuk forecasting.")
+                st.stop()
+
+            img = handle_model_training(train, test, sequence_length, freq, forecast_horizon)
             if img:
                 multiplot_ai_interpretation(img, 'timeseries')
-                
-
+            else:
+                st.warning("Klik tombol 'Train Model' untuk melatih model peramalan.")
+                st.stop()
+            
+            
         elif methods == 'Regression':
             st.header("Peramalan dengan Regresi")
 
