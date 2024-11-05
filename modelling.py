@@ -17,9 +17,22 @@ import io
 
 # --------------------- LSTM Model Function ---------------------
 
-def train_lstm_model(train, test, freq=None):
-    st.subheader("Pengaturan LSTM")
-    
+# --------------------- LSTM Training Function ---------------------
+def train_lstm_model(train, test, sequence_length, freq, forecast_horizon):
+    """
+    Train an LSTM model on the provided training data and forecast future values.
+
+    Parameters:
+    - train: Training data (pd.DataFrame or np.array)
+    - test: Testing data (pd.DataFrame or np.array)
+    - sequence_length: Length of the input sequences for LSTM
+    - freq: Frequency of the data ('Harian', 'Bulanan', 'Triwulan', 'Tahunan')
+    - forecast_horizon: Number of periods to forecast
+
+    Returns:
+    - y_pred: Predicted values for the test set
+    - forecast_series: Forecasted future values as a pandas Series
+    """
     # Step 1: Scaling
     scaler = MinMaxScaler(feature_range=(0, 1))
     try:
@@ -28,55 +41,12 @@ def train_lstm_model(train, test, freq=None):
         full_data = np.concatenate((train_values, test_values), axis=0)
         scaled_data = scaler.fit_transform(full_data)
     except Exception as e:
-        st.error(f"Terjadi kesalahan dalam scaling data: {e}")
-        st.stop()
+        raise ValueError(f"Terjadi kesalahan dalam scaling data: {e}")
     
     # Step 2: Sequence creation
-    sequence_length = st.number_input(
-        "Masukkan panjang sequence (menentukan seberapa banyak data sebelumnya yang dilihat oleh model saat membuat prediksi):", 
-        min_value=1, 
-        step=1,
-        help="Panjang sequence diperlukan untuk LSTM (menentukan seberapa banyak data sebelumnya yang dilihat oleh model saat membuat prediksi).",
-        value=None
-    )
-    if not sequence_length:
-        st.warning("Isi terlebih dahulu panjang sequence.")
-        st.stop()
+    if sequence_length is None or sequence_length < 1:
+        raise ValueError("Panjang sequence harus diisi dan minimal 1.")
     
-    # Prompt user to select frequency if freq is None
-    if freq is None:
-        freq = st.selectbox(
-            "Pilih frekuensi data:",
-            options=['Harian', 'Bulanan', 'Triwulan', 'Tahunan'],
-            help="Pilih frekuensi data yang sesuai dengan dataset Anda."
-        )
-        if not freq:
-            st.warning("Pilih frekuensi data.")
-            st.stop()
-    
-    # Mapping frekuensi ke label forecast_horizon
-    freq_label_map = {
-        'Harian': "jumlah hari untuk peramalan:",
-        'Bulanan': "jumlah bulan untuk peramalan:",
-        'Triwulan': "jumlah triwulan untuk peramalan:",
-        'Tahunan': "jumlah tahun untuk peramalan:"
-    }
-    forecast_label = "Masukkan " + freq_label_map.get(freq, "jumlah periode untuk forecasting:")
-    
-    forecast_horizon = st.number_input(
-        forecast_label,
-        min_value=1,
-        step=1,
-        value=None,
-        help=f"Jumlah {freq.lower()} ke depan yang akan diprediksi.",
-        key='forecast_horizon'
-    )
-    if not forecast_horizon:
-        st.warning("Isi terlebih dahulu jumlah periode untuk forecasting.")
-        st.stop()
-
-    st.write(f"Melakukan forecasting untuk {forecast_horizon} {freq.lower()} ke depan.")
-
     def create_sequences(data, seq_length):
         X, y = [], []
         for i in range(seq_length, len(data)):
@@ -92,8 +62,7 @@ def train_lstm_model(train, test, freq=None):
     y_test = y_data[split_index:]
     
     if len(X_train) == 0 or len(X_test_seq) == 0:
-        st.error("Panjang sequence terlalu besar untuk data yang diberikan.")
-        st.stop()
+        raise ValueError("Panjang sequence terlalu besar untuk data yang diberikan.")
     
     # Reshape for LSTM: [samples, time_steps, features]
     X_train = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
@@ -106,27 +75,26 @@ def train_lstm_model(train, test, freq=None):
         model.add(LSTM(50))
         model.add(Dense(1))
         model.compile(optimizer='adam', loss='mse', metrics=['mse'])
-        with st.spinner("Melatih model LSTM..."):
-            history = model.fit(
-                X_train, y_train,
-                epochs=100,
-                batch_size=32,
-                validation_data=(X_test_seq, y_test),
-                verbose=0
-            )
-        st.success("Pelatihan model LSTM selesai.")
+        history = model.fit(
+            X_train, y_train,
+            epochs=100,
+            batch_size=32,
+            validation_data=(X_test_seq, y_test),
+            verbose=0
+        )
     except Exception as e:
-        st.error(f"Terjadi kesalahan dalam pelatihan model LSTM: {e}")
-        st.stop()
+        raise ValueError(f"Terjadi kesalahan dalam pelatihan model LSTM: {e}")
     
     # Step 4: Predict on Test Data
     try:
         y_pred_scaled = model.predict(X_test_seq)
         y_pred = scaler.inverse_transform(y_pred_scaled).flatten()
-        y_pred = pd.Series(y_pred, index=test.index)
+        if isinstance(test, (pd.DataFrame, pd.Series)):
+            y_pred = pd.Series(y_pred, index=test.index[-len(y_pred):])
+        else:
+            y_pred = pd.Series(y_pred)
     except Exception as e:
-        st.error(f"Terjadi kesalahan dalam prediksi dan inverse scaling: {e}")
-        st.stop()
+        raise ValueError(f"Terjadi kesalahan dalam prediksi dan inverse scaling: {e}")
     
     # Step 5: Forecast Future Values
     try:
@@ -142,7 +110,7 @@ def train_lstm_model(train, test, freq=None):
             last_sequence = np.concatenate((last_sequence[:, 1:, :], next_pred_scaled.reshape(1, 1, 1)), axis=1)
         
         # Create a date range for the forecasted values
-        last_date = test.index[-1]
+        last_date = test.index[-1] if isinstance(test, pd.DataFrame) or isinstance(test, pd.Series) else pd.Timestamp.today()
         
         # Map freq to pandas frequency string
         freq_map = {
@@ -161,23 +129,35 @@ def train_lstm_model(train, test, freq=None):
         )
         forecast_series = pd.Series(forecast, index=future_dates)
     except Exception as e:
-        st.error(f"Terjadi kesalahan dalam forecast: {e}")
-        st.stop()
+        raise ValueError(f"Terjadi kesalahan dalam forecast: {e}")
     
     return y_pred, forecast_series
 
 # --------------------- Main Training Function ---------------------
 
-def train_model_timeseries(train, test, freq):
+def train_model_timeseries(train, test, sequence_length, freq, forecast_horizon):
     """
     Train LSTM time series model and forecast future values.
-    """
-    st.header("Melatih Model Peramalan dengan LSTM")
 
-    y_pred, forecast_series = train_lstm_model(train, test, freq)
+    Parameters:
+    - train: Training data (pd.DataFrame or np.array)
+    - test: Testing data (pd.DataFrame or np.array)
+    - sequence_length: Length of input sequences for LSTM
+    - freq: Frequency of the data ('Harian', 'Bulanan', 'Triwulan', 'Tahunan')
+    - forecast_horizon: Number of periods to forecast
+
+    Returns:
+    - y_true: Actual values from the test set
+    - y_pred: Predicted values for the test set
+    - forecast_series: Forecasted future values as a pandas Series
+    """
+    y_pred, forecast_series = train_lstm_model(train, test, sequence_length, freq, forecast_horizon)
 
     # Prepare y_true based on y_pred's index to ensure consistency
-    y_true = test.loc[y_pred.index]
+    if isinstance(test, (pd.DataFrame, pd.Series)):
+        y_true = test.loc[y_pred.index]
+    else:
+        y_true = pd.Series(test[-len(y_pred):])
 
     # Compute metrics
     try:
@@ -187,11 +167,10 @@ def train_model_timeseries(train, test, freq):
         mse = mean_squared_error(y_true_array, y_pred_array)
         rmse = math.sqrt(mse)
         mae = mean_absolute_error(y_true_array, y_pred_array)
-        mape = mean_absolute_percentage_error(y_true_array, y_pred_array)
+        mape = mean_absolute_percentage_error(y_true_array, y_pred_array) * 100  # Convert to percentage
         r2 = r2_score(y_true_array, y_pred_array)
     except Exception as e:
-        st.error(f"Terjadi kesalahan dalam perhitungan metrik: {e}")
-        st.stop()
+        raise ValueError(f"Terjadi kesalahan dalam perhitungan metrik: {e}")
 
     st.subheader("Hasil Evaluasi Model")
     # Penjelasan formal untuk setiap metrik
@@ -280,14 +259,23 @@ def evaluate_plot_model_results(train, y_test, y_pred, forecast_series):
     # Mengembalikan list berisi buffer dari semua gambar
     return img_buffers
 
-
 # --------------------- Handler Function ---------------------
 @st.cache_data
-def handle_model_training(train, test, freq):
+def handle_model_training(train, test, sequence_length, freq, forecast_horizon):
     """
     Handle model training, forecasting, and evaluation.
+
+    Parameters:
+    - train: Training data (pd.DataFrame or np.array)
+    - test: Testing data (pd.DataFrame or np.array)
+    - sequence_length: Length of input sequences for LSTM
+    - freq: Frequency of the data ('Harian', 'Bulanan', 'Triwulan', 'Tahunan')
+    - forecast_horizon: Number of periods to forecast
+
+    Returns:
+    - img: List of image buffers for the generated plots
     """
-    y_true, y_pred, forecast_series = train_model_timeseries(train, test, freq)
+    y_true, y_pred, forecast_series = train_model_timeseries(train, test, sequence_length, freq, forecast_horizon)
     img = evaluate_plot_model_results(pd.Series(train, index=train.index), y_true, y_pred, forecast_series)
     return img
 
