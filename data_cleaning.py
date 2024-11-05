@@ -101,7 +101,7 @@ def handle_upload():
             st.info("Please upload a CSV, TSV, or Excel file.")
             return None
     
-    elif data_source == "Fetch from API":
+    elif data_source == "Upload melalui API":
         api_url = st.text_input("Enter the API URL:")
         if api_url:
             st.info(f"Fetching data from API: {api_url}")
